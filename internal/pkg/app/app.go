@@ -31,7 +31,7 @@ func New() *App {
 func (a *App) Start() {
 	output := a.kafka.Output()
 	wg := sync.WaitGroup{}
-	batchSize := 50
+	batchSize := 100
 	writeTime := 10 * time.Second
 	items := make([]model.Item, 0, batchSize)
 	wg.Add(1)

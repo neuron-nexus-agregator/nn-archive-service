@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"agregator/archive/internal/interfaces"
 	model "agregator/archive/internal/model/kafka"
 	"agregator/archive/internal/service/db"
 	"agregator/archive/internal/service/kafka"
@@ -17,14 +18,14 @@ type App struct {
 	kafka *kafka.Kafka
 }
 
-func New() *App {
-	db, err := db.New()
+func New(logger interfaces.Logger) *App {
+	db, err := db.New(logger)
 	if err != nil {
 		panic(err)
 	}
 	return &App{
 		db:    db,
-		kafka: kafka.New([]string{os.Getenv("KAFKA_ADDR")}, "archive-group-id", "archive"),
+		kafka: kafka.New([]string{os.Getenv("KAFKA_ADDR")}, "archive-group-id", "archive", logger),
 	}
 }
 

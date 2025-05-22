@@ -3,19 +3,20 @@ package kafka
 import (
 	"context"
 	"encoding/json"
-	"log"
 
 	"github.com/segmentio/kafka-go"
 
+	"agregator/archive/internal/interfaces"
 	kafka_model "agregator/archive/internal/model/kafka"
 )
 
 type Kafka struct {
 	reader *kafka.Reader
 	output chan kafka_model.Item
+	logger interfaces.Logger
 }
 
-func New(brokers []string, groupID, topic string) *Kafka {
+func New(brokers []string, groupID, topic string, logger interfaces.Logger) *Kafka {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: brokers,
 		GroupID: groupID,
@@ -24,6 +25,7 @@ func New(brokers []string, groupID, topic string) *Kafka {
 	return &Kafka{
 		reader: reader,
 		output: make(chan kafka_model.Item, 50),
+		logger: logger,
 	}
 }
 
@@ -41,24 +43,24 @@ func (k *Kafka) StartReading(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done(): // Завершаем чтение, если контекст отменен
-			log.Println("Kafka reader stopped due to context cancellation")
+			k.logger.Info("Kafka reader stopped due to context cancellation")
 			return
 		default:
 			msg, err := k.reader.ReadMessage(ctx)
 			if err != nil {
-				log.Printf("Error reading message from Kafka (topic: %s): %v\n", k.reader.Config().Topic, err)
+				k.logger.Error("Error reading message from Kafka", "error", err, "topic", k.reader.Config().Topic)
 				continue
 			}
 			item := kafka_model.Item{}
 			err = json.Unmarshal(msg.Value, &item)
 			if err != nil {
-				log.Printf("Error decoding Kafka message (topic: %s): %v\n", k.reader.Config().Topic, err)
+				k.logger.Error("Error decoding Kafka message", "error", err, "topic", k.reader.Config().Topic)
 				continue
 			}
 			select {
 			case k.output <- item: // Отправляем сообщение в канал
 			case <-ctx.Done(): // Проверяем отмену контекста
-				log.Println("Kafka reader stopped while sending to output channel")
+				k.logger.Info("Kafka reader stopped due to context cancellation")
 				return
 			}
 		}

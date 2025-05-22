@@ -9,15 +9,17 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/patrickmn/go-cache"
 
+	"agregator/archive/internal/interfaces"
 	"agregator/archive/internal/model/kafka"
 )
 
 type DB struct {
-	db    *sqlx.DB
-	cache *cache.Cache
+	db     *sqlx.DB
+	cache  *cache.Cache
+	logger interfaces.Logger
 }
 
-func New() (*DB, error) {
+func New(logger interfaces.Logger) (*DB, error) {
 	connectionData := fmt.Sprintf(
 		"user=%s dbname=%s sslmode=disable password=%s host=%s port=%s",
 		os.Getenv("DB_LOGIN"),
@@ -39,8 +41,9 @@ func New() (*DB, error) {
 	cache := cache.New(10*time.Minute, 20*time.Minute)
 
 	return &DB{
-		db:    db,
-		cache: cache,
+		db:     db,
+		cache:  cache,
+		logger: logger,
 	}, nil
 }
 
@@ -54,6 +57,9 @@ func (g *DB) UpdateByMD5(item kafka.Item) error {
         SET title = $1, description = $2, full_text = $3, link = $4, enclosure = $5, category = $6
         WHERE md5 = $7
     `, item.Title, item.Description, item.FullText, item.Link, item.Enclosure, item.Category, item.MD5)
+	if err != nil {
+		g.logger.Error("Error updating feed", "error", err.Error())
+	}
 	return err
 }
 
@@ -75,6 +81,9 @@ func (g *DB) UpdateByMD5Batch(items []kafka.Item) error {
 
 	// Выполняем запрос
 	_, err := g.db.Exec(query, values...)
+	if err != nil {
+		g.logger.Error("Error updating feed", "error", err.Error())
+	}
 	return err
 }
 
@@ -106,5 +115,8 @@ func (g *DB) InsertBatch(items []kafka.Item) error {
 	`
 	// Выполняем запрос
 	_, err := g.db.Exec(query, values...)
+	if err != nil {
+		g.logger.Error("Error inserting feed", "error", err.Error())
+	}
 	return err
 }

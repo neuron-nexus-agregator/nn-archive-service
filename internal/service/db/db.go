@@ -89,7 +89,23 @@ func (g *DB) UpdateByMD5Batch(items []kafka.Item) error {
 
 func (g *DB) InsertBatch(items []kafka.Item) error {
 	if len(items) == 0 {
-		return nil // Нечего вставлять
+		return nil // Nothing to insert
+	}
+
+	// Дедупликация элементов по link
+	uniqueItems := make(map[string]kafka.Item)
+	for _, item := range items {
+		uniqueItems[item.Link] = item
+	}
+
+	// Преобразуем map обратно в слайс для вставки
+	var finalItems []kafka.Item
+	for _, item := range uniqueItems {
+		finalItems = append(finalItems, item)
+	}
+
+	if len(finalItems) == 0 {
+		return nil // После дедупликации ничего не осталось
 	}
 
 	// Формируем пакетный запрос
@@ -98,7 +114,7 @@ func (g *DB) InsertBatch(items []kafka.Item) error {
         VALUES
     `
 	values := []interface{}{}
-	for i, item := range items {
+	for i, item := range finalItems {
 		d := i * 10
 		query += fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d),",
 			d+1, d+2, d+3, d+4, d+5, d+6, d+7, d+8, d+9, d+10)
